@@ -33,6 +33,7 @@ class LitellmModel:
         self.n_calls = 0
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
+        print(f"Model initialized with {self.config}")
 
     @retry(
         stop=stop_after_attempt(10),
@@ -60,6 +61,8 @@ class LitellmModel:
             raise e
 
     def query(self, messages: list[dict[str, str]], **kwargs) -> dict:
+        print(f"query with kwargs {kwargs}")
+        print("env var keys: ", {k: v for k, v in os.environ.items() if "KEY" in k})
         response = self._query(messages, **kwargs)
         cost = litellm.cost_calculator.completion_cost(response)
         self.n_calls += 1
