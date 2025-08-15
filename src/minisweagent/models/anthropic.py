@@ -16,4 +16,5 @@ class AnthropicModel(LitellmModel):
         api_key = None
         if rotating_keys := os.getenv("ANTHROPIC_API_KEYS"):
             api_key = get_key_per_thread(rotating_keys.split("::"))
-        return super().query(set_cache_control(messages), api_key=api_key, **kwargs)
+        # return super().query(set_cache_control(messages), api_key=api_key, **kwargs)
+        return super().query(messages, api_key=api_key, **kwargs)
