@@ -9,7 +9,7 @@ from minisweagent.models import get_model
 @dataclass
 class RouletteModelConfig:
     model_kwargs: list[dict]
-    model_name: str ="roulette"
+    model_name: str = "roulette"
     developer_names: list[str] | None = None
 
 
@@ -40,3 +40,47 @@ class RouletteModel:
             name = random.choice(self.config.developer_names)
             response["content"] = f"{name}:\n{response['content']}"
         return response
+
+
+@dataclass
+class InterleavingModelConfig:
+    model_kwargs: list[dict]
+    model_name: str = "interleaving"
+    sequence: list[int] | None = None
+    """If set to 0, 0, 1, we will return the first model 2 times, then the second model 1 time,
+    then the first model again, etc."""
+
+
+class InterleavingModel(RouletteModel):
+    def __init__(self, *, config_class: Callable = InterleavingModelConfig, **kwargs):
+        super().__init__(config_class=config_class, **kwargs)
+
+    def select_model(self) -> Model:
+        if self.config.sequence is None:
+            i_model = self.n_calls % len(self.models)
+        else:
+            i_model = self.config.sequence[self.n_calls % len(self.config.sequence)]
+        return self.models[i_model]
+
+
+@dataclass
+class FirstThenModelConfig:
+    model_kwargs: list[dict]
+    calls_per_model: list[int]
+    """When we have 3 models, and calls_per_model is [2, 1], we will return the first model 2 times,
+    then the second model 1 time, and finally the 3rd model all the remaining times."""
+    model_name: str = "first_then"
+
+    def __post_init__(self):
+        if len(self.model_kwargs) != len(self.calls_per_model) - 1:
+            raise ValueError("calls_per_model must have one less element than the number of models")
+
+
+class FirstThenModel(InterleavingModel):
+    def select_model(self) -> Model:
+        calls_so_far = 0
+        for i, calls in enumerate(self.config.calls_per_model):
+            calls_so_far += calls
+            if self.n_calls < calls_so_far:
+                return self.models[i]
+        return self.models[-1]

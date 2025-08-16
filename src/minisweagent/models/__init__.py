@@ -76,6 +76,14 @@ def get_model_class(model_name: str) -> type:
         from minisweagent.models.roulette import RouletteModel
 
         return RouletteModel
+    if model_name.lower() == "first_then":
+        from minisweagent.models.roulette import FirstThenModel
+
+        return FirstThenModel
+    if model_name.lower() == "interleaving":
+        from minisweagent.models.roulette import InterleavingModel
+
+        return InterleavingModel
     if any(s in model_name.lower() for s in ["anthropic", "sonnet", "opus", "claude"]):
         from minisweagent.models.anthropic import AnthropicModel
 
