@@ -10,6 +10,7 @@ from minisweagent.models import get_model
 class RouletteModelConfig:
     model_kwargs: list[dict]
     model_name: str ="roulette"
+    developer_names: list[str] | None = None
 
 
 class RouletteModel:
@@ -35,4 +36,7 @@ class RouletteModel:
         model = self.select_model()
         response = model.query(*args, **kwargs)
         response["model_name"] = model.config.model_name
+        if self.config.developer_names:
+            name = random.choice(self.config.developer_names)
+            response["content"] = f"{name}:\n{response['content']}"
         return response
