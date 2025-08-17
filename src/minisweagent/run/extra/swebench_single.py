@@ -57,10 +57,12 @@ def main(
     env = get_sb_environment(config, instance)
     agent_config = config.get("agent", {})
     selected_agent_class = get_agent_class(agent_config.get("agent_class", "interactive"))
+    if selected_agent_class.__name__ in ["InteractiveAgent", "TextualAgent"]:
+        agent_config["mode"] = "yolo"
     agent = selected_agent_class(
         get_model(model_name, config.get("model", {})),
         env,
-        **({"mode": "yolo"} | agent_config),
+        **agent_config,
     )
 
     exit_status, result = None, None

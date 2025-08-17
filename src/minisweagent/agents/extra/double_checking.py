@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from minisweagent import Environment, Model
 from minisweagent.agents.default import AgentConfig, DefaultAgent
 
 
@@ -10,8 +11,8 @@ class DoubleCheckingAgentConfig(AgentConfig):
 
 
 class DoubleCheckingAgent(DefaultAgent):
-    def __init__(self, *, config_class: Callable = DoubleCheckingAgentConfig, **kwargs):
-        super().__init__(config_class=config_class, **kwargs)
+    def __init__(self, model: Model, env: Environment, *, config_class: Callable = DoubleCheckingAgentConfig, **kwargs):
+        super().__init__(model, env, config_class=config_class, **kwargs)
         self.submit_unlocked = False
 
     def has_finished(self, output: dict[str, str]):
