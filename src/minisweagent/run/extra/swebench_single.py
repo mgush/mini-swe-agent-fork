@@ -7,7 +7,7 @@ import yaml
 from datasets import load_dataset
 
 from minisweagent import global_config_dir
-from minisweagent.agents.interactive import InteractiveAgent
+from minisweagent.agents import get_agent_class
 from minisweagent.config import builtin_config_dir, get_config_path
 from minisweagent.models import get_model
 from minisweagent.run.extra.swebench import (
@@ -31,6 +31,7 @@ def main(
     model_name: str | None = typer.Option(None, "-m", "--model", help="Model to use", rich_help_panel="Basic"),
     config_path: Path = typer.Option( builtin_config_dir / "extra" / "swebench.yaml", "-c", "--config", help="Path to a config file", rich_help_panel="Basic"),
     environment_class: str | None = typer.Option(None, "--environment-class", rich_help_panel="Advanced"),
+    agent_class: str | None = typer.Option(None, "--agent-class", help="Agent class to use", rich_help_panel="Advanced"),
     exit_immediately: bool = typer.Option( False, "--exit-immediately", help="Exit immediately when the agent wants to finish instead of prompting.", rich_help_panel="Basic"),
     output: Path = typer.Option(DEFAULT_OUTPUT, "-o", "--output", help="Output trajectory file", rich_help_panel="Basic"),
 ) -> None:
@@ -49,13 +50,17 @@ def main(
     config = yaml.safe_load(get_config_path(config_path).read_text())
     if environment_class is not None:
         config.setdefault("environment", {})["environment_class"] = environment_class
+    if agent_class is not None:
+        config.setdefault("agent", {})["agent_class"] = agent_class
     if exit_immediately:
         config.setdefault("agent", {})["confirm_exit"] = False
     env = get_sb_environment(config, instance)
-    agent = InteractiveAgent(
+    agent_config = config.get("agent", {})
+    selected_agent_class = get_agent_class(agent_config.get("agent_class", "interactive"))
+    agent = selected_agent_class(
         get_model(model_name, config.get("model", {})),
         env,
-        **({"mode": "yolo"} | config.get("agent", {})),
+        **({"mode": "yolo"} | agent_config),
     )
 
     exit_status, result = None, None
