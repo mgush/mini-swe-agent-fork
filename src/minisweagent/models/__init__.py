@@ -88,6 +88,10 @@ def get_model_class(model_name: str) -> type:
         from minisweagent.models.sample import SampleModel
 
         return SampleModel
+    if model_name.lower() == "improve":
+        from minisweagent.models.improve import ImproveModel
+
+        return ImproveModel
     if any(s in model_name.lower() for s in ["anthropic", "sonnet", "opus", "claude"]):
         from minisweagent.models.anthropic import AnthropicModel
 

@@ -8,7 +8,6 @@ from jinja2 import Template
 
 from minisweagent import Model
 from minisweagent.models import get_model
-from minisweagent.utils.log import logger
 
 
 @dataclass
@@ -50,7 +49,6 @@ class SampleModel(Model):
         response = model.query(messages)
         _actions = re.findall(r"```bash\n(.*?)\n```", response["content"], re.DOTALL)
         if len(_actions) != 1:
-            logger.warning(f"Sample {i_sample} returned {len(_actions)} actions, expected 1")
             return None
         return _actions[0].strip()
 
@@ -64,9 +62,7 @@ class SampleModel(Model):
                 action = future.result()
                 if action is not None:
                     actions.append(action)
-        actions = list(set(actions))
-        logger.debug(f"Got {len(actions)} unique actions from {self.config.n_samples} samples")
-        return actions
+        return list(set(actions))
 
     def query(self, messages: list[dict]) -> dict:
         actions = self._get_samples(messages)
