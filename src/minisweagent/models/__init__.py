@@ -76,7 +76,7 @@ def get_model_class(model_name: str) -> type:
         from minisweagent.models.roulette import RouletteModel
 
         return RouletteModel
-    if model_name.lower() == "first_then":
+    if model_name.lower() == "firstthen":
         from minisweagent.models.roulette import FirstThenModel
 
         return FirstThenModel

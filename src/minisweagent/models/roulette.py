@@ -68,11 +68,14 @@ class FirstThenModelConfig:
     model_name: str = "first_then"
 
     def __post_init__(self):
-        if len(self.model_kwargs) != len(self.calls_per_model) - 1:
-            raise ValueError("calls_per_model must have one less element than the number of models")
+        if len(self.model_kwargs) != len(self.calls_per_model) + 1:
+            raise ValueError(f"calls_per_model must have one less element than the number of models, got {len(self.calls_per_model)}, {len(self.model_kwargs)} models.")
 
 
 class FirstThenModel(InterleavingModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, config_class=FirstThenModelConfig)
+
     def select_model(self) -> Model:
         calls_so_far = 0
         for i, calls in enumerate(self.config.calls_per_model):

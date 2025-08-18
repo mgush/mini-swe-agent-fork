@@ -7,13 +7,14 @@ from minisweagent.agents.default import AgentConfig, DefaultAgent, Submitted
 
 @dataclass
 class DoubleCheckingAgentConfig(AgentConfig):
-    submit_unlocked_template: str = "Please rerun the command and submit the final output."
+    submit_unlocked_template: str = ""
 
 
 class DoubleCheckingAgent(DefaultAgent):
     def __init__(self, model: Model, env: Environment, *, config_class: Callable = DoubleCheckingAgentConfig, **kwargs):
         super().__init__(model, env, config_class=config_class, **kwargs)
         self.submit_unlocked = False
+        assert self.config.submit_unlocked_template
 
     def has_finished(self, output: dict[str, str]):
         try:

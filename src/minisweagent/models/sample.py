@@ -1,11 +1,13 @@
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from jinja2 import Template
 
 from minisweagent import Model
 from minisweagent.models import get_model
+from minisweagent.utils.log import logger
 
 
 @dataclass
@@ -15,27 +17,49 @@ class SampleModelConfig:
     sample_model_kwargs: list[dict]
     model_name: str = "sample"
     n_samples: int = 10
+    model_kwargs: Any = None  # ignored
 
 
 class SampleModel(Model):
     def __init__(self, *, config_class: Callable = SampleModelConfig, **kwargs):
         self.config = config_class(**kwargs)
-        self.decider_model = get_model(**self.config.decider_model_kwargs)
-        self.sample_models = [get_model(**config) for config in self.config.sample_model_kwargs]
+        self.decider_model = get_model(config=self.config.decider_model_kwargs)
+        self.sample_models = [get_model(config=config) for config in self.config.sample_model_kwargs]
+
+    @property
+    def n_calls(self) -> int:
+        # Don't include the sample model calls in the total number of calls
+        return self.decider_model.n_calls
+
+    @property
+    def cost(self) -> float:
+        return self.decider_model.cost + sum(model.cost for model in self.sample_models)
+
+    def get_template_vars(self) -> dict:
+        return {
+            "n_model_calls": self.n_calls,
+            "model_cost": self.cost,
+            "n_samples": self.config.n_samples,
+        }
 
     def _get_samples(self, messages: list[dict]) -> list[dict]:
         actions = []
         for i_sample in range(self.config.n_samples):
             model = self.sample_models[i_sample % len(self.sample_models)]
             response = model.query(messages)
-            actions = re.findall(r"```bash\n(.*?)\n```", response["content"], re.DOTALL)
-            if len(actions) != 1:
+            _actions = re.findall(r"```bash\n(.*?)\n```", response["content"], re.DOTALL)
+            if len(_actions) != 1:
+                logger.warning(f"Sample {i_sample} returned {len(_actions)} actions, expected 1")
                 continue
-            actions.append(actions[0].strip())
-        return list(set(actions))
+            actions.append(_actions[0].strip())
+        actions = list(set(actions))
+        logger.debug(f"Got {len(actions)} unique actions from {self.config.n_samples} samples")
+        return actions
 
     def query(self, messages: list[dict]) -> dict:
         actions = self._get_samples(messages)
-        prompt = Template(self.config.decider_template).render(actions=actions)
-        messages = [*messages, {"role": "user", "content": prompt}]
-        return self.decider_model.query(messages)
+        extra_prompt = Template(self.config.decider_template).render(actions=actions)
+        messages = [*messages, {"role": "user", "content": extra_prompt}]
+        result = self.decider_model.query(messages)
+        result["extra_prompt"] = extra_prompt
+        return result
