@@ -28,4 +28,8 @@ def get_environment_class(spec: str) -> type[Environment]:
 def get_environment(config: dict, *, default_type: str = "") -> Environment:
     config = copy.deepcopy(config)
     environment_class = config.pop("environment_class", default_type)
+    print("Env config:", config)
+    print("Env class:", environment_class)
+    # env = get_environment_class(environment_class)(**config)
+    # return None
     return get_environment_class(environment_class)(**config)

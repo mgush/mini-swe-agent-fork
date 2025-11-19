@@ -12,6 +12,7 @@ import time
 import traceback
 from pathlib import Path
 
+from tqdm.auto import tqdm
 import typer
 import yaml
 from datasets import load_dataset
@@ -60,9 +61,9 @@ class ProgressTrackingAgent(DefaultAgent):
 
     def step(self) -> dict:
         """Override step to provide progress updates."""
-        self.progress_manager.update_instance_status(
-            self.instance_id, f"Step {self.model.n_calls + 1:3d} (${self.model.cost:.2f})"
-        )
+        # self.progress_manager.update_instance_status(
+        #     self.instance_id, f"Step {self.model.n_calls + 1:3d} (${self.model.cost:.2f})"
+        # )
         return super().step()
 
 
@@ -199,7 +200,7 @@ def main(
     output: str = typer.Option("", "-o", "--output", help="Output directory", rich_help_panel="Basic"),
     workers: int = typer.Option(1, "-w", "--workers", help="Number of worker threads for parallel processing", rich_help_panel="Basic"),
     model: str | None = typer.Option(None, "-m", "--model", help="Model to use", rich_help_panel="Basic"),
-    model_class: str | None = typer.Option(None, "-c", "--model-class", help="Model class to use (e.g., 'anthropic' or 'minisweagent.models.anthropic.AnthropicModel')", rich_help_panel="Advanced"),
+    model_class: str | None = typer.Option(None, "-mc", "--model-class", help="Model class to use (e.g., 'anthropic' or 'minisweagent.models.anthropic.AnthropicModel')", rich_help_panel="Advanced"),
     redo_existing: bool = typer.Option(False, "--redo-existing", help="Redo existing instances", rich_help_panel="Data selection"),
     config_spec: Path = typer.Option( builtin_config_dir / "extra" / "swebench.yaml", "-c", "--config", help="Path to a config file", rich_help_panel="Basic"),
     environment_class: str | None = typer.Option( None, "--environment-class", help="Environment type to use. Recommended are docker or singularity", rich_help_panel="Advanced"),
@@ -234,32 +235,32 @@ def main(
     progress_manager = RunBatchProgressManager(len(instances), output_path / f"exit_statuses_{time.time()}.yaml")
 
     def process_futures(futures: dict[concurrent.futures.Future, str]):
-        for future in concurrent.futures.as_completed(futures):
+        for future in tqdm(concurrent.futures.as_completed(futures)):
             try:
-                future.result()
+                future.result(timeout=360)
             except concurrent.futures.CancelledError:
                 pass
             except Exception as e:
                 instance_id = futures[future]
                 logger.error(f"Error in future for instance {instance_id}: {e}", exc_info=True)
-                progress_manager.on_uncaught_exception(instance_id, e)
+                # progress_manager.on_uncaught_exception(instance_id, e)
 
-    with Live(progress_manager.render_group, refresh_per_second=4):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {
-                executor.submit(process_instance, instance, output_path, config, progress_manager): instance[
-                    "instance_id"
-                ]
-                for instance in instances
-            }
-            try:
-                process_futures(futures)
-            except KeyboardInterrupt:
-                logger.info("Cancelling all pending jobs. Press ^C again to exit immediately.")
-                for future in futures:
-                    if not future.running() and not future.done():
-                        future.cancel()
-                process_futures(futures)
+    # with Live(progress_manager.render_group, refresh_per_second=4):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(process_instance, instance, output_path, config, progress_manager): instance[
+                "instance_id"
+            ]
+            for instance in instances
+        }
+        try:
+            process_futures(futures)
+        except KeyboardInterrupt:
+            logger.info("Cancelling all pending jobs. Press ^C again to exit immediately.")
+            for future in futures:
+                if not future.running() and not future.done():
+                    future.cancel()
+            process_futures(futures)
 
 
 if __name__ == "__main__":

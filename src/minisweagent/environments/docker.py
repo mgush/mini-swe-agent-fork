@@ -2,6 +2,7 @@ import logging
 import os
 import shlex
 import subprocess
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -34,6 +35,7 @@ class DockerEnvironmentConfig:
 
 
 class DockerEnvironment:
+
     def __init__(self, *, config_class: type = DockerEnvironmentConfig, logger: logging.Logger | None = None, **kwargs):
         """This class executes bash commands in a Docker container using direct docker commands.
         See `DockerEnvironmentConfig` for keyword arguments.
@@ -41,6 +43,7 @@ class DockerEnvironment:
         self.logger = logger or logging.getLogger("minisweagent.environment")
         self.container_id: str | None = None
         self.config = config_class(**kwargs)
+
         self._start_container()
 
     def get_template_vars(self) -> dict[str, Any]:
@@ -55,6 +58,8 @@ class DockerEnvironment:
             "-d",
             "--name",
             container_name,
+            "-m",
+            "4g",
             "-w",
             self.config.cwd,
             *self.config.run_args,
@@ -62,7 +67,7 @@ class DockerEnvironment:
             "sleep",
             self.config.container_timeout,
         ]
-        self.logger.debug(f"Starting container with command: {shlex.join(cmd)}")
+        self.logger.info(f"Starting container with command: {shlex.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -86,6 +91,8 @@ class DockerEnvironment:
             cmd.extend(["-e", f"{key}={value}"])
         cmd.extend([self.container_id, "bash", "-lc", command])
 
+        self.logger.info("Executing docker command: %s", cmd)
+
         result = subprocess.run(
             cmd,
             text=True,
@@ -101,7 +108,31 @@ class DockerEnvironment:
         """Stop and remove the Docker container."""
         if getattr(self, "container_id", None) is not None:  # if init fails early, container_id might not be set
             cmd = f"(timeout 60 {self.config.executable} stop {self.container_id} || {self.config.executable} rm -f {self.container_id}) >/dev/null 2>&1 &"
+
+            cmd = f"{self.config.executable} rm -f {self.container_id} >/dev/null 2>&1"
+            cmd = f"{self.config.executable} stop {self.container_id} >/dev/null 2>&1"
+            self.logger.info("Cleanup container %s with cmd %s", self.container_id, cmd)
             subprocess.Popen(cmd, shell=True)
+
+            # cmd = f"{self.config.executable} image rm {self.config.image} >/dev/null 2>&1 &"
+            # cmd = f"{self.config.executable} image rm {self.config.image}"
+            time.sleep(10)
+            cmd = [self.config.executable, "image", "rm", self.config.image]
+            self.logger.info("Cleanup image with cmd %s", cmd)
+            # subprocess.Popen(cmd, shell=True)
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                # stdout=subprocess.PIPE,
+                # stderr=subprocess.STDOUT,
+            )
+
+            self.logger.info("Cleanup image result: %s", result)
+            self.logger.info("output: %s", result.stdout)
+            self.logger.info("returncode: %s", result.returncode)
 
     def __del__(self):
         """Cleanup container when object is destroyed."""
